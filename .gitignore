@@ -1,0 +1,7 @@
+/.bundle/
+/.devintel/
+/pkg/
+/tmp/
+/coverage/
+*.gem
+.rspec_status

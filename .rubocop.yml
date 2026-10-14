@@ -1,0 +1,29 @@
+AllCops:
+  TargetRubyVersion: 3.3
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "vendor/**/*"
+    - "tmp/**/*"
+
+# The codebase is consistently double-quoted.
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/Documentation:
+  Enabled: true
+
+Metrics/BlockLength:
+  Exclude:
+    - "spec/**/*"
+
+Metrics/MethodLength:
+  Max: 20
+
+Layout/LineLength:
+  Max: 110
+
+# Example groups legitimately define constants and long describe blocks.
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - "spec/**/*"
