@@ -52,6 +52,10 @@ module DevIntel
         @db.transaction(&)
       end
 
+      def last_insert_id
+        @db.last_insert_row_id
+      end
+
       def close
         @db.close unless @db.closed?
       end

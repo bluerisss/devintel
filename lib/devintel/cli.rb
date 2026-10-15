@@ -2,7 +2,6 @@
 
 require "thor"
 require "devintel"
-require "devintel/presenters/index_summary"
 
 module DevIntel
   # Command-line entry point.
@@ -31,6 +30,17 @@ module DevIntel
       workspace = Workspace.discover(options[:path])
       result = Index::Indexer.new(workspace).call(force: options[:force])
       say Presenters::IndexSummary.new(result).to_s
+    rescue DevIntel::Error => e
+      abort_with(e)
+    end
+
+    desc "trace SYMBOL", "Show what reaches a symbol, what it reaches, and which tests name it"
+    method_option :path, type: :string, default: ".",
+                         desc: "Directory inside the repository to start from"
+    def trace(symbol)
+      workspace = Workspace.discover(options[:path])
+      result = Graph::Trace.call(workspace, symbol)
+      say Presenters::Trace.new(result).to_s
     rescue DevIntel::Error => e
       abort_with(e)
     end

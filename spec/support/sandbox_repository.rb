@@ -29,6 +29,21 @@ module SandboxRepository
     end
   end
 
+  # Copies a committed fixture tree (spec/fixtures/<name>) into a throwaway
+  # repository. The fixtures are real, readable Ruby files — the kind of code
+  # DevIntel is meant to understand — while the copy keeps DevIntel's own
+  # `.devintel/` output out of this repository.
+  # @yield [Pathname] the repository root
+  def with_fixture_repository(name)
+    source = Pathname.new(File.expand_path("../fixtures/#{name}", __dir__))
+    raise ArgumentError, "unknown fixture: #{name}" unless source.directory?
+
+    with_repository do |root|
+      FileUtils.cp_r("#{source}/.", root.to_s)
+      yield root
+    end
+  end
+
   def write_file(root, path, contents = "")
     absolute = root.join(path)
     absolute.dirname.mkpath

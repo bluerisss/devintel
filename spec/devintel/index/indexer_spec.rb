@@ -19,7 +19,7 @@ RSpec.describe DevIntel::Index::Indexer do
       expect(result.added).to eq(2)
       expect(result.modified).to eq(0)
       expect(result.unchanged).to eq(0)
-      expect(result.indexed).to eq(2)
+      expect(result.parsed).to eq(2)
     end
   end
 
@@ -58,8 +58,8 @@ RSpec.describe DevIntel::Index::Indexer do
       result = index(root)
 
       expect(result.unchanged).to eq(1)
-      expect(result.indexed).to eq(0)
-      expect(result.changed).to eq(0)
+      expect(result.parsed).to eq(0)
+      expect(result.removed).to eq(0)
     end
   end
 
@@ -163,7 +163,7 @@ RSpec.describe DevIntel::Index::Indexer do
       result = index(root)
 
       expect(result.discovered).to eq(0)
-      expect(result.indexed).to eq(0)
+      expect(result.parsed).to eq(0)
     end
   end
 end

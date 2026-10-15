@@ -11,4 +11,11 @@ module DevIntel
 
   # The on-disk index is newer than this build of DevIntel understands.
   class SchemaTooNewError < Error; end
+
+  # A command needs an index that has not been built yet.
+  class IndexNotFoundError < Error; end
+
+  # The name given to a command matches no symbol, or matches several.
+  class SymbolNotFoundError < Error; end
+  class AmbiguousSymbolError < Error; end
 end

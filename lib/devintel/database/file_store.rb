@@ -23,11 +23,13 @@ module DevIntel
         rows.to_h { |row| [row["path"], to_record(row)] }
       end
 
+      # @return [Integer] id of the inserted row.
       def insert(path:, language:, hash:, size:, now: Time.now.utc)
         @connection.execute(
           "INSERT INTO files (path, language, hash, size, updated_at) VALUES (?, ?, ?, ?, ?)",
           [path, language, hash, size, now.iso8601]
         )
+        @connection.last_insert_id
       end
 
       def update(id:, language:, hash:, size:, now: Time.now.utc)
@@ -51,6 +53,18 @@ module DevIntel
 
       def count
         @connection.value("SELECT COUNT(*) FROM files")
+      end
+
+      # 'ok' or 'error'; see schema migration 2.
+      def set_parse_state(id, state)
+        @connection.execute("UPDATE files SET parse_state = ? WHERE id = ?", [state, id])
+      end
+
+      # The paths themselves, not just a count: a file DevIntel could not read
+      # is only actionable if the reader is told which one it was.
+      def parse_error_paths
+        @connection.execute("SELECT path FROM files WHERE parse_state = 'error' ORDER BY path")
+                   .map { |row| row["path"] }
       end
 
       private

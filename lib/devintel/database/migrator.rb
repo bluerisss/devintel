@@ -11,39 +11,22 @@ module DevIntel
     class Migrator
       # Each entry is [version, SQL]. Append new versions; never edit a version
       # that has shipped.
-      MIGRATIONS = [
-        [
-          1,
-          <<~SQL
-            CREATE TABLE files (
-              id         INTEGER PRIMARY KEY AUTOINCREMENT,
-              path       TEXT    NOT NULL UNIQUE,
-              language   TEXT    NOT NULL,
-              hash       TEXT    NOT NULL,
-              size       INTEGER NOT NULL,
-              updated_at TEXT    NOT NULL
-            );
 
-            CREATE INDEX index_files_on_language ON files (language);
-
-            CREATE TABLE metadata (
-              key   TEXT PRIMARY KEY,
-              value TEXT NOT NULL
-            );
-          SQL
-        ]
-      ].freeze
-
-      LATEST_VERSION = MIGRATIONS.map(&:first).max
+      LATEST_VERSION = Migrations::LATEST_VERSION
 
       def initialize(connection)
         @connection = connection
       end
 
+      # @return [Array<Integer>] versions applied by this call. A caller that
+      #   has already indexed must treat a non-empty result as "the index can
+      #   no longer answer what it used to" and re-analyse everything: file
+      #   hashes survive migrations, so otherwise every file would look
+      #   unchanged and the new tables would stay empty.
       def migrate!
         ensure_migrations_table
 
-        pending.each do |version, sql|
+        pending.map do |version, sql|
           @connection.transaction do
             @connection.execute_batch(sql)
             @connection.execute(
@@ -51,9 +34,8 @@ module DevIntel
               [version, Time.now.utc.iso8601]
             )
           end
+          version
         end
-
-        current_version
       end
 
       def current_version
@@ -74,7 +56,7 @@ module DevIntel
                 "Delete .devintel/ and re-run `devintel index`."
         end
 
-        MIGRATIONS.reject { |migration| applied.include?(migration.first) }
+        Migrations::ALL.reject { |migration| applied.include?(migration.first) }
       end
 
       def applied_versions

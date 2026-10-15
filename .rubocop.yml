@@ -5,6 +5,8 @@ AllCops:
   Exclude:
     - "vendor/**/*"
     - "tmp/**/*"
+    # Fixtures are inputs to the parser, not code the project maintains.
+    - "spec/fixtures/**/*"
 
 # The codebase is consistently double-quoted.
 Style/StringLiterals:
@@ -25,5 +27,20 @@ Layout/LineLength:
 
 # Example groups legitimately define constants and long describe blocks.
 Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - "spec/**/*"
+
+# Visitors and the indexing service are cohesive dispatch/orchestration
+# classes; splitting them further to satisfy a line count would hurt.
+Metrics/ClassLength:
+  Max: 120
+  Exclude:
+    # A Prism visitor's length is its dispatch surface: one method per node
+    # type it understands. Splitting that table across classes would make the
+    # grammar it handles harder to see, not easier.
+    - "lib/devintel/parser/symbol_extractor.rb"
+
+# Test data builders take one keyword per field by design.
+Metrics/ParameterLists:
   Exclude:
     - "spec/**/*"

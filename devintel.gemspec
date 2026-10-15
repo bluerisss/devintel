@@ -24,6 +24,12 @@ Gem::Specification.new do |spec|
   spec.executables = ["devintel"]
   spec.require_paths = ["lib"]
 
+  # Prism is the official Ruby parser: error tolerant, precise about locations,
+  # and decoupled from the running Ruby, so DevIntel can read syntax from a
+  # Ruby version other than its own. It ships as a default gem from Ruby 3.3,
+  # but is declared explicitly so the version in use is pinned rather than
+  # whatever the host Ruby happens to bundle.
+  spec.add_dependency "prism", "~> 1.0"   # Ruby AST
   spec.add_dependency "sqlite3", "~> 2.0" # local index storage
   spec.add_dependency "thor", "~> 1.3"    # CLI parsing / subcommands
 
