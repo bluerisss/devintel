@@ -1,4 +1,6 @@
 /.bundle/
+# A gem declares its constraints in the gemspec; the resolved lock is local.
+/Gemfile.lock
 /.devintel/
 /pkg/
 /tmp/

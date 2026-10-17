@@ -16,6 +16,15 @@ module DevIntel
         end
       end
 
+      # A file that exercises the symbol, plus how we know.
+      TestFile = Data.define(:path, :line, :type)
+
+      # Which files count as tests. This is policy, not a fact about the graph,
+      # so it lives with the service rather than with the queries: a spec earns
+      # the link by *referencing* the symbol, and this only decides which of
+      # those referencing files are tests.
+      TEST_PATH = %r{(\A|/)(spec|test)/|_spec\.rb\z|_test\.rb\z}
+
       Result = Data.define(:query, :definitions, :callers, :callees, :untraced, :tests)
 
       def self.call(workspace, query)
@@ -39,19 +48,36 @@ module DevIntel
 
       def build(graph)
         name = resolve_name(graph)
+        callers = graph.callers(name)
         callees = graph.callees(name)
 
         Result.new(
           query: name,
           definitions: graph.definitions(name),
-          callers: group(graph.callers(name)),
-          # Untraceable edges are summarised rather than listed: they are real
-          # relationships, but they lead outside what DevIntel can follow.
-          callees: group(callees.select { |edge| Resolution.traceable?(edge.resolution) }),
-          untraced: callees.reject { |edge| Resolution.traceable?(edge.resolution) }
-                           .group_by(&:resolution).transform_values(&:size),
-          tests: graph.tests(name)
+          callers: group(callers),
+          callees: group(traceable(callees)),
+          untraced: summarise(callees),
+          tests: tests(callers)
         )
+      end
+
+      def traceable(edges)
+        edges.select { |edge| Resolution.traceable?(edge.resolution) }
+      end
+
+      # Edges that lead where DevIntel cannot follow are counted rather than
+      # listed: they are real relationships, and an empty callee list would
+      # otherwise read as "this symbol depends on nothing".
+      def summarise(edges)
+        edges.reject { |edge| Resolution.traceable?(edge.resolution) }
+             .group_by(&:resolution)
+             .transform_values(&:size)
+      end
+
+      def tests(callers)
+        callers.select { |edge| TEST_PATH.match?(edge.path) }
+               .group_by(&:path)
+               .map { |path, edges| TestFile.new(path: path, line: edges.first.line, type: edges.first.type) }
       end
 
       # An exact qualified name wins; otherwise a unique simple name is

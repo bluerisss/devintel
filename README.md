@@ -19,10 +19,12 @@ index an application on Ruby 3.1 / Rails 7.0.
 
 ## Status
 
-Milestones 0-3 are implemented: `devintel index` builds the symbol graph —
+Milestones 0-5 are implemented: `devintel index` builds the symbol graph —
 classes, modules, methods, constants, inheritance, mixins, calls and constant
-references — and `devintel trace` answers what reaches a symbol and what it
-reaches. Impact analysis, review and the web UI are not implemented yet.
+references — `devintel trace` answers what reaches a symbol and what it
+reaches, `devintel map` serves that as a local web UI, and `devintel diff`
+maps the changes against a base onto the symbols they land on. Impact analysis
+and review are not implemented yet.
 
 ## Requirements
 
@@ -94,12 +96,87 @@ Index now holds
 | --- | --- | --- |
 | `devintel --version` | available | Print the DevIntel version |
 | `devintel index` | available | Build or update the local index |
-| `devintel map` | planned | Local web UI for the knowledge map |
+| `devintel map` | available | Local web UI for the knowledge map |
 | `devintel search <query>` | planned | Search symbols and relationships |
 | `devintel trace <symbol>` | available | Callers, callees and tests for a symbol |
+| `devintel diff` | available | Symbols the changes against a base land on |
 | `devintel impact` | planned | Impact of a change against a base ref |
 | `devintel review` | planned | Deterministic review findings for a diff |
 | `devintel doctor` | planned | Diagnose the local index |
+
+### `devintel diff`
+
+```sh
+devintel diff                          # working tree vs HEAD
+devintel diff --base origin/develop
+```
+
+```
+DevIntel Diff
+
+  Repository  /path/to/your/app
+  Base        origin/develop  (merge base 14a3e0d)
+
+Changed files  4
+  deleted   app/models/legacy.rb
+  modified  app/services/payment_service.rb  lines 2, 6, 10, 12-13
+  added     app/services/refund_service.rb   lines 1-3
+  modified  config/database.yml              line 2
+
+Changed symbols  6
+  method    PaymentService#audit         app/services/payment_service.rb:13-13
+  method    PaymentService#charge        app/services/payment_service.rb:9-11
+  method    PaymentService#execute       app/services/payment_service.rb:4-7
+  constant  PaymentService::MAX_RETRIES  app/services/payment_service.rb:2-2
+  class     RefundService                app/services/refund_service.rb:1-3
+  method    RefundService#execute        app/services/refund_service.rb:2-2
+
+No symbols mapped
+  app/models/legacy.rb  deleted
+  config/database.yml   not Ruby
+```
+
+`--base` is compared through the **merge base**, not the ref itself: on a
+feature branch, diffing `origin/develop` directly also reports everything that
+landed on develop afterwards, as though you had reverted it.
+
+A changed line is attributed to the **innermost** definition spanning it, so a
+change inside a method belongs to that method rather than to its class. Blank
+lines are ignored — the innermost symbol spanning one is usually the whole
+class. Untracked files count as changes; a brand new service is a change even
+though Git has never seen it.
+
+The third section is not optional. A changed file yields no symbols when it is
+deleted, not Ruby, missing from the index, or **changed since the last index** —
+and in that last case the stored line numbers describe different code, so
+mapping through them would name whichever symbol used to sit there. DevIntel
+says so and points at `devintel index` instead.
+
+### `devintel map`
+
+```sh
+devintel map             # http://127.0.0.1:7421
+devintel map --port 8080
+```
+
+```
+DevIntel Knowledge Map
+
+  Repository  /path/to/your/app
+  Serving     http://127.0.0.1:7421
+
+Local only; nothing leaves this machine. Press Ctrl-C to stop.
+```
+
+Search a symbol, select it, and the page shows where it is defined, a
+three-column graph of callers → symbol → callees, and every relationship with
+its evidence class and `file:line`. Clicking any node or name traces that
+symbol in turn.
+
+The server binds to `127.0.0.1` and also **checks the `Host` header**, because
+any page in the browser can issue requests to localhost: without that check a
+visited website could read the structure of a private codebase. Nothing is
+fetched from the network — no CDN, no fonts, no analytics.
 
 ### `devintel trace`
 
@@ -144,13 +221,24 @@ analysis logic.
 
 ```mermaid
 flowchart TD
-    CLI["CLI (Thor)<br/>DevIntel::CLI"] --> SVC
-    CLI --> PRES["Presenters::IndexSummary"]
-    SVC["Application service<br/>Index::Indexer"] --> DOM
-    SVC --> INFRA
-    DOM["Domain<br/>Repository::Detector<br/>Index::FileDiscovery<br/>Index::ContentDigest"]
-    INFRA["Infrastructure<br/>Database::Connection<br/>Database::Migrator<br/>Database::FileStore"] --> DB[("SQLite<br/>.devintel/index.sqlite")]
+    CLI["CLI (Thor)<br/>index · trace · map"] --> IDX
+    CLI --> TRACE
+    CLI --> UI
+    UI["UI::Server (WEBrick)<br/>UI::Api"] --> TRACE
+    UI --> GRAPH
+    IDX["Index::Indexer"] --> PARSE
+    IDX --> RESOLVE
+    IDX --> INFRA
+    TRACE["Graph::Trace"] --> GRAPH
+    PARSE["Parser::RubyParser<br/>Parser::SymbolExtractor"]
+    RESOLVE["Graph::Resolver<br/>Graph::ConstantLookup"] --> INFRA
+    GRAPH["Graph::SymbolGraph"] --> INFRA
+    INFRA["Database::Connection · Migrator<br/>FileStore · SymbolStore · ReferenceStore"] --> DB[("SQLite<br/>.devintel/index.sqlite")]
 ```
+
+`trace` and `map` are two front-ends over the **same** graph. There is no
+second dependency engine: the UI is another caller of `Graph::SymbolGraph`,
+and its JSON API is the contract that keeps the browser code replaceable.
 
 An indexing run:
 
@@ -289,6 +377,26 @@ is reported by `devintel index` so the omission stays visible:
 - `.git`, `.devintel`, `node_modules`, `tmp`, `log` and `vendor` are skipped at
   any depth. `.gitignore` is not consulted yet.
 - Symlinks are not followed.
+
+## The web UI
+
+`lib/devintel/ui/public/` is one HTML file, one stylesheet and one script, with
+no build step and no npm. A React or Svelte toolchain inside a RubyGem would
+mean a bundler, a `package.json`, and committed build output so that
+`gem install devintel` still works — all to render a search box, two lists and
+a diagram. Cytoscape.js was skipped for the same reason: vendoring ~400 KB to
+avoid a CDN call that §Privacy forbids anyway, when the view DevIntel needs is
+a fixed three-column layout where direction is the whole point. A physics
+simulation would scramble exactly the information the diagram exists to show.
+
+The JSON API is the stable part. Replacing the front-end later should not
+touch anything below `UI::Api`.
+
+The server is covered by specs that make real HTTP requests, because the bugs
+that matter there live in the boundary itself — parameter decoding, the Host
+check, status codes — and are invisible to a test that calls Ruby methods
+directly. The browser code itself has no automated test suite; it was verified
+by executing it against live API responses in a DOM stub.
 
 ## Development
 

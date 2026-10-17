@@ -36,13 +36,7 @@ module DevIntel
       end
 
       def locations
-        [["Repository", @result.root.to_s], ["Database", relative_database_path]]
-          .then { |pairs| render_pairs(pairs) }
-      end
-
-      def render_pairs(pairs)
-        width = pairs.map { |label, _value| label.length }.max
-        pairs.map { |label, value| format("  %-#{width}s  %s", label, value) }.join("\n")
+        Table.rows([["Repository", @result.root.to_s], ["Database", relative_database_path]]).join("\n")
       end
 
       # What the indexer did. Every discovered file is in exactly one of
@@ -131,14 +125,9 @@ module DevIntel
       end
 
       def section(title, rows)
-        count_width = rows.map { |row| row.count.to_s.length }.max
-        label_width = rows.map { |row| row.label.length }.max
+        cells = rows.map { |row| [row.count, row.label, row.note] }
 
-        [title, *rows.map { |row| render_row(row, count_width, label_width) }].join("\n")
-      end
-
-      def render_row(row, count_width, label_width)
-        format("  %#{count_width}d  %-#{label_width}s  %s", row.count, row.label, row.note).rstrip
+        [title, *Table.rows(cells, align: [Table::RIGHT])].join("\n")
       end
 
       # "class 4, method 3, constant 1"

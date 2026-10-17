@@ -85,6 +85,55 @@ RSpec.describe "devintel executable" do
     end
   end
 
+  describe "diff" do
+    it "maps changed lines to symbols against a base" do
+      with_git_repository("app/a.rb" => "class A\n  def one; end\n  def two; end\nend\n") do |root, git|
+        git.branch!("feature")
+        write_file(root, "app/a.rb", "class A\n  def one; end\n  def two; 42; end\nend\n")
+        run("index", chdir: root)
+
+        stdout, _stderr, status = run("diff", "--base", "base", chdir: root)
+
+        expect(status).to eq(0)
+        expect(stdout).to start_with("DevIntel Diff\n")
+        expect(stdout).to match(%r{modified\s+app/a\.rb\s+line 3})
+        expect(stdout).to match(/method\s+A#two/)
+      end
+    end
+
+    it "defaults to comparing the working tree against HEAD" do
+      with_git_repository("app/a.rb" => "class A\n  def one; end\nend\n") do |root, _git|
+        write_file(root, "app/a.rb", "class A\n  def one; 1; end\nend\n")
+        run("index", chdir: root)
+
+        stdout, _stderr, status = run("diff", chdir: root)
+
+        expect(status).to eq(0)
+        expect(stdout).to match(/method\s+A#one/)
+      end
+    end
+
+    it "reports an unknown base as a message, not a crash" do
+      with_git_repository("app/a.rb" => "class A; end\n") do |root, _git|
+        run("index", chdir: root)
+
+        _stdout, stderr, status = run("diff", "--base", "no-such-ref", chdir: root)
+
+        expect(status).to eq(1)
+        expect(stderr).to include("Unknown base `no-such-ref`")
+      end
+    end
+
+    it "tells the developer to index first" do
+      with_git_repository("app/a.rb" => "class A; end\n") do |root, _git|
+        _stdout, stderr, status = run("diff", chdir: root)
+
+        expect(status).to eq(1)
+        expect(stderr).to include("Run `devintel index` first")
+      end
+    end
+  end
+
   describe "trace" do
     let(:files) do
       {

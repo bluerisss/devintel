@@ -45,6 +45,31 @@ module DevIntel
       abort_with(e)
     end
 
+    desc "diff", "Show which symbols the changes against a base land on"
+    method_option :path, type: :string, default: ".",
+                         desc: "Directory inside the repository to start from"
+    method_option :base, type: :string, default: "HEAD",
+                         desc: "Commit, branch or tag to compare the working tree against"
+    def diff
+      workspace = Workspace.discover(options[:path])
+      result = DevIntel::Diff::Analyzer.call(workspace, base: options[:base])
+      say Presenters::Diff.new(result).to_s
+    rescue DevIntel::Error => e
+      abort_with(e)
+    end
+
+    desc "map", "Browse the symbol graph in a local web UI"
+    method_option :path, type: :string, default: ".",
+                         desc: "Directory inside the repository to start from"
+    method_option :port, type: :numeric, default: UI::Server::DEFAULT_PORT,
+                         desc: "Port to serve the UI on"
+    def map
+      workspace = Workspace.discover(options[:path])
+      UI::Server.new(workspace, port: options[:port]).start
+    rescue DevIntel::Error => e
+      abort_with(e)
+    end
+
     private
 
     # Expected failures are a readable message on stderr and exit 1; anything

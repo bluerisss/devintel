@@ -19,7 +19,8 @@ Gem::Specification.new do |spec|
   # 3.3 is the floor because Prism ships as a default gem from 3.3 onwards.
   spec.required_ruby_version = ">= 3.3.0"
 
-  spec.files = Dir.glob("lib/**/*.rb") + Dir.glob("bin/*") + %w[README.md LICENSE devintel.gemspec]
+  spec.files = Dir.glob("lib/**/*.rb") + Dir.glob("lib/**/public/*") + Dir.glob("bin/*") +
+               %w[README.md LICENSE devintel.gemspec]
   spec.bindir      = "bin"
   spec.executables = ["devintel"]
   spec.require_paths = ["lib"]
@@ -32,6 +33,10 @@ Gem::Specification.new do |spec|
   spec.add_dependency "prism", "~> 1.0"   # Ruby AST
   spec.add_dependency "sqlite3", "~> 2.0" # local index storage
   spec.add_dependency "thor", "~> 1.3"    # CLI parsing / subcommands
+  # Serving the local UI. Not in the standard library since Ruby 3.0, and the
+  # alternative is hand-written HTTP on TCPServer: request parsing, response
+  # framing and concurrency that DevIntel would then own and have to get right.
+  spec.add_dependency "webrick", "~> 1.8" # local HTTP server for `devintel map`
 
   spec.metadata["rubygems_mfa_required"] = "true"
 end

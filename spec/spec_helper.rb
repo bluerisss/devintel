@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "devintel"
+require "erb"
 require "tmpdir"
 require "fileutils"
 require "pathname"
@@ -15,4 +16,6 @@ RSpec.configure do |config|
   Kernel.srand config.seed
 
   config.include SandboxRepository
+  config.include RunningServer
+  config.include GitRepository
 end

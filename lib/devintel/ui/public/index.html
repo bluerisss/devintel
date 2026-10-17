@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- No external origins: everything this page needs is served locally. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+  <title>DevIntel Knowledge Map</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="bar">
+    <h1>DevIntel</h1>
+    <input id="search" type="search" placeholder="Search symbols&hellip;" autocomplete="off" spellcheck="false"
+           aria-label="Search symbols">
+    <p id="stats" class="stats"></p>
+  </header>
+
+  <main class="layout">
+    <nav class="results" aria-label="Search results">
+      <ul id="results"></ul>
+      <p id="results-empty" class="empty">Type to search classes, modules, methods and constants.</p>
+    </nav>
+
+    <section class="detail">
+      <div id="detail-empty" class="empty">Select a symbol to see what reaches it and what it reaches.</div>
+      <article id="detail" hidden>
+        <h2 id="symbol-name"></h2>
+        <ul id="definitions" class="definitions"></ul>
+
+        <figure class="graph">
+          <figcaption>Callers &rarr; symbol &rarr; callees. Click a node to trace it.</figcaption>
+          <div id="graph"></div>
+        </figure>
+
+        <div class="columns">
+          <div>
+            <h3>Callers <span id="callers-count" class="count"></span></h3>
+            <ul id="callers" class="edges"></ul>
+          </div>
+          <div>
+            <h3>Callees <span id="callees-count" class="count"></span></h3>
+            <ul id="callees" class="edges"></ul>
+            <p id="untraced" class="untraced"></p>
+          </div>
+        </div>
+
+        <div id="tests-section">
+          <h3>Tests <span id="tests-count" class="count"></span></h3>
+          <ul id="tests" class="tests"></ul>
+        </div>
+
+        <p class="legend">
+          <span class="badge FACT">FACT</span> read from the source
+          <span class="badge INFERENCE">INFERENCE</span> derived, e.g. <code>Foo.new.bar</code>
+          <span class="badge UNKNOWN">UNKNOWN</span> not determinable statically
+        </p>
+      </article>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

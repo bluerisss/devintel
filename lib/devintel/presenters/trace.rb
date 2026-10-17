@@ -70,19 +70,16 @@ module DevIntel
 
       def render_rows(relations)
         cells = relations.map { |relation| cells_for(relation) }
-        widths = cells.transpose.map { |column| column.map(&:length).max }
 
-        relations.zip(cells).map { |relation, row| render_row(relation, row, widths) }
+        Table.rows(cells).zip(relations).map { |line, relation| "#{line}  #{suffix(relation)}".rstrip }
       end
 
       def cells_for(relation)
         [relation.qualified_name, relation.type, relation.evidence_class, reaches(relation)]
       end
 
-      def render_row(relation, cells, widths)
-        columns = cells.zip(widths).map { |value, width| value.ljust(width) }.join("  ")
-
-        "  #{columns}  #{relation.location}#{occurrences(relation)}".rstrip
+      def suffix(relation)
+        "#{relation.location}#{occurrences(relation)}"
       end
 
       # Which member of the traced symbol this edge lands on, shown relative to

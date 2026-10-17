@@ -28,11 +28,6 @@ module DevIntel
         end
       end
 
-      # A file that exercises the symbol, plus how we know.
-      TestFile = Data.define(:path, :line, :type)
-
-      TEST_PATH = %r{(\A|/)(spec|test)/|_spec\.rb\z|_test\.rb\z}
-
       # `FileStore.new` resolves its receiver but not its method; naming the
       # member keeps that row distinguishable from one that resolved fully.
       REACHES = <<~SQL.strip
@@ -54,6 +49,29 @@ module DevIntel
           FROM symbols s JOIN files f ON f.id = s.file_id
           WHERE s.qualified_name = ?
           ORDER BY f.path, s.line_start
+        SQL
+        rows.map { |row| to_definition(row) }
+      end
+
+      # Symbols whose name contains the query, nearest match first.
+      #
+      # A LIKE scan over the indexed `name` column rather than FTS5: symbol
+      # names are short identifiers, not prose, and substring matching is what
+      # a developer typing "PaymentSer" actually wants. FTS would add a second
+      # copy of the data and a tokeniser that splits on the wrong boundaries.
+      def search(query, limit: 50)
+        pattern = "%#{escape_like(query)}%"
+
+        prefix = "#{escape_like(query)}%"
+
+        rows = @connection.execute(<<~SQL, [pattern, pattern, query, prefix, limit])
+          SELECT s.qualified_name, s.type, f.path, s.line_start, s.line_end
+          FROM symbols s JOIN files f ON f.id = s.file_id
+          WHERE s.name LIKE ? ESCAPE '\\' OR s.qualified_name LIKE ? ESCAPE '\\'
+          ORDER BY
+            CASE WHEN s.name = ? THEN 0 WHEN s.name LIKE ? ESCAPE '\\' THEN 1 ELSE 2 END,
+            LENGTH(s.qualified_name), s.qualified_name
+          LIMIT ?
         SQL
         rows.map { |row| to_definition(row) }
       end
@@ -123,15 +141,6 @@ module DevIntel
         rows.map { |row| to_edge(row) }
       end
 
-      # Test files are identified by what they reference, not by their name:
-      # a spec earns the link by actually naming the symbol.
-      def tests(qualified_name)
-        callers(qualified_name)
-          .select { |edge| TEST_PATH.match?(edge.path) }
-          .group_by(&:path)
-          .map { |path, edges| TestFile.new(path: path, line: edges.first.line, type: edges.first.type) }
-      end
-
       private
 
       # A symbol and everything nested in it: "User", "User#name", "User.find",
@@ -142,6 +151,12 @@ module DevIntel
 
       def like_arguments(qualified_name)
         [qualified_name, "#{qualified_name}#%", "#{qualified_name}.%", "#{qualified_name}::%"]
+      end
+
+      # `%` and `_` are wildcards in LIKE; a developer searching for "find_by"
+      # means a literal underscore.
+      def escape_like(value)
+        value.gsub(/([%_\\])/) { "\\#{Regexp.last_match(1)}" }
       end
 
       def to_definition(row)
