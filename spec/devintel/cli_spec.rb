@@ -134,6 +134,38 @@ RSpec.describe "devintel executable" do
     end
   end
 
+  describe "impact" do
+    let(:app) do
+      {
+        "app/a.rb" => "class A\n  def self.go(x)\n    x\n  end\nend\n",
+        "app/b.rb" => "class B\n  def run\n    A.go(1)\n  end\nend\n"
+      }
+    end
+
+    it "walks the graph from the changed symbols to what calls them" do
+      with_git_repository(app) do |root, _git|
+        write_file(root, "app/a.rb", "class A\n  def self.go(x)\n    x * 2\n  end\nend\n")
+        run("index", chdir: root)
+
+        stdout, _stderr, status = run("impact", "--base", "base", chdir: root)
+
+        expect(status).to eq(0)
+        expect(stdout).to start_with("DevIntel Impact\n")
+        expect(stdout).to match(/method\s+A\.go/)
+        expect(stdout).to match(%r{HIGH\s+B#run\s+app/b\.rb:3\s+calls A\.go})
+      end
+    end
+
+    it "tells the developer to index first" do
+      with_git_repository(app) do |root, _git|
+        _stdout, stderr, status = run("impact", chdir: root)
+
+        expect(status).to eq(1)
+        expect(stderr).to include("Run `devintel index` first")
+      end
+    end
+  end
+
   describe "trace" do
     let(:files) do
       {

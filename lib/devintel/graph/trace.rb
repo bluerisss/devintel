@@ -16,15 +16,6 @@ module DevIntel
         end
       end
 
-      # A file that exercises the symbol, plus how we know.
-      TestFile = Data.define(:path, :line, :type)
-
-      # Which files count as tests. This is policy, not a fact about the graph,
-      # so it lives with the service rather than with the queries: a spec earns
-      # the link by *referencing* the symbol, and this only decides which of
-      # those referencing files are tests.
-      TEST_PATH = %r{(\A|/)(spec|test)/|_spec\.rb\z|_test\.rb\z}
-
       Result = Data.define(:query, :definitions, :callers, :callees, :untraced, :tests)
 
       def self.call(workspace, query)
@@ -57,7 +48,7 @@ module DevIntel
           callers: group(callers),
           callees: group(traceable(callees)),
           untraced: summarise(callees),
-          tests: tests(callers)
+          tests: TestFiles.from(callers)
         )
       end
 
@@ -72,12 +63,6 @@ module DevIntel
         edges.reject { |edge| Resolution.traceable?(edge.resolution) }
              .group_by(&:resolution)
              .transform_values(&:size)
-      end
-
-      def tests(callers)
-        callers.select { |edge| TEST_PATH.match?(edge.path) }
-               .group_by(&:path)
-               .map { |path, edges| TestFile.new(path: path, line: edges.first.line, type: edges.first.type) }
       end
 
       # An exact qualified name wins; otherwise a unique simple name is

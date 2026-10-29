@@ -8,6 +8,9 @@ module DevIntel
     # in two files is one thing to a developer, and both definitions should
     # answer to the same name.
     class SymbolGraph
+      # Top-level code has no enclosing definition to name.
+      FILE_SCOPE = "(file scope)"
+
       # A symbol together with where it is written.
       Definition = Data.define(:qualified_name, :type, :path, :line_start, :line_end) do
         def location
@@ -109,7 +112,7 @@ module DevIntel
       def callers(qualified_name)
         rows = @connection.execute(<<~SQL, like_arguments(qualified_name) * 3)
           SELECT r.type, r.resolution, f.path, r.line,
-                 COALESCE(src.qualified_name, '(file scope)') AS qualified_name,
+                 COALESCE(src.qualified_name, '#{FILE_SCOPE}') AS qualified_name,
                  #{REACHES} AS reaches
           FROM symbol_references r
           JOIN files f ON f.id = r.file_id

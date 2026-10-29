@@ -19,12 +19,13 @@ index an application on Ruby 3.1 / Rails 7.0.
 
 ## Status
 
-Milestones 0-5 are implemented: `devintel index` builds the symbol graph —
+Milestones 0-6 are implemented: `devintel index` builds the symbol graph —
 classes, modules, methods, constants, inheritance, mixins, calls and constant
 references — `devintel trace` answers what reaches a symbol and what it
-reaches, `devintel map` serves that as a local web UI, and `devintel diff`
-maps the changes against a base onto the symbols they land on. Impact analysis
-and review are not implemented yet.
+reaches, `devintel map` serves that as a local web UI, `devintel diff` maps
+the changes against a base onto the symbols they land on, and
+`devintel impact` walks the graph out from there. Review rules are not
+implemented yet.
 
 ## Requirements
 
@@ -100,9 +101,71 @@ Index now holds
 | `devintel search <query>` | planned | Search symbols and relationships |
 | `devintel trace <symbol>` | available | Callers, callees and tests for a symbol |
 | `devintel diff` | available | Symbols the changes against a base land on |
-| `devintel impact` | planned | Impact of a change against a base ref |
+| `devintel impact` | available | What a change against a base could affect |
 | `devintel review` | planned | Deterministic review findings for a diff |
 | `devintel doctor` | planned | Diagnose the local index |
+
+### `devintel impact`
+
+```sh
+devintel impact --base origin/develop
+```
+
+```
+DevIntel Impact
+
+  Repository  /path/to/your/app
+  Base        main  (merge base ddd0306)
+
+Changed symbols  1  -  what the diff landed on
+  method  PaymentService#charge  app/services/payment_service.rb:2-4
+
+Direct impact  2  -  symbols that call a changed symbol
+  MEDIUM  Order#total            app/models/order.rb:3            calls PaymentService#charge
+  MEDIUM  OrderService#checkout  app/services/order_service.rb:3  calls PaymentService#charge
+
+Indirect impact  2  -  more than one step away, up to 3
+  LOW  PaymentsController#create  app/controllers/payments_controller.rb:3  calls OrderService#checkout
+  LOW  RetryJob#perform           app/jobs/retry_job.rb:3                   calls OrderService#checkout
+
+Entry points  3  -  nothing outside the tests calls these
+  Order#total
+  PaymentsController#create
+  RetryJob#perform
+
+Tests  1  -  files that reference an impacted symbol
+  spec/services/payment_service_spec.rb  covers PaymentService#charge
+```
+
+It walks the graph `devintel index` already built — there is no second
+dependency engine — following only edges that resolve to a definition in this
+repository. Every row carries the line that is the evidence for it.
+
+**Confidence** is kept separate from risk, and the rule is one line so it can
+be argued with: *one point per step from the change, plus one if any step was
+inferred rather than observed.*
+
+| score | level | what it means |
+| --- | --- | --- |
+| 1 | HIGH | a direct call, observed in the source |
+| 2 | MEDIUM | a direct call through an inferred receiver, or two observed steps |
+| 3+ | LOW | further away, or inference compounded by distance |
+
+Distance counts because every hop is a place the change can be absorbed: if A
+calls B calls C and C changed, B may well handle it.
+
+**Entry points** are impacted symbols nothing outside the tests calls. Either
+behaviour enters the system there — a controller action, a job, a rake task —
+or nothing reaches the code at all. Static analysis cannot tell those apart,
+so the heading states what was actually checked rather than claiming one.
+
+**Tests** are files that *name* a symbol, which is not the same as testing it.
+A method's lookup includes the class that owns it, because a spec says
+`RSpec.describe PaymentService`, not `RSpec.describe PaymentService.charge`.
+
+Traversal stops at 3 steps and at 500 impacted symbols; both limits are
+stated in the output rather than silently applied. Risk assessment belongs to
+`devintel review`, not here.
 
 ### `devintel diff`
 

@@ -58,6 +58,19 @@ module DevIntel
       abort_with(e)
     end
 
+    desc "impact", "Show what the changes against a base could affect"
+    method_option :path, type: :string, default: ".",
+                         desc: "Directory inside the repository to start from"
+    method_option :base, type: :string, default: "HEAD",
+                         desc: "Commit, branch or tag to compare the working tree against"
+    def impact
+      workspace = Workspace.discover(options[:path])
+      result = DevIntel::Impact::Analyzer.call(workspace, base: options[:base])
+      say Presenters::Impact.new(result).to_s
+    rescue DevIntel::Error => e
+      abort_with(e)
+    end
+
     desc "map", "Browse the symbol graph in a local web UI"
     method_option :path, type: :string, default: ".",
                          desc: "Directory inside the repository to start from"

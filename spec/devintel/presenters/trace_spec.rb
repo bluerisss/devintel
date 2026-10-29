@@ -78,8 +78,8 @@ RSpec.describe DevIntel::Presenters::Trace do
   end
 
   it "lists the test files that name the symbol" do
-    tests = [DevIntel::Graph::Trace::TestFile.new(path: "spec/services/order_service_spec.rb",
-                                                  line: 3, type: "REFERENCES")]
+    tests = [DevIntel::Graph::TestFiles::TestFile.new(path: "spec/services/order_service_spec.rb",
+                                                      line: 3, type: "REFERENCES")]
 
     expect(render(tests: tests)).to include("spec/services/order_service_spec.rb")
   end
